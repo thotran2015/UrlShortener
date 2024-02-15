@@ -1,0 +1,20 @@
+version: '3'
+
+services:
+  redis:
+    image: redis:latest
+    volumes:
+      - redis-data:/data
+    networks:
+      - short-url
+    # Map host port to redis port in container
+    ports:
+      - "6379:6379"
+
+# Ensure all services share the same network, so they can connect via container names
+networks:
+  short-url: null
+
+volumes:
+  redis-data:
+
