@@ -2,7 +2,9 @@ version: '3'
 
 services:
   redis:
-    image: redis:latest
+    build:
+      context: ./docker/redis
+      dockerfile: Dockerfile
     volumes:
       - redis-data:/data
     networks:
@@ -11,10 +13,21 @@ services:
     ports:
       - "6379:6379"
 
+  cassandra:
+    image: cassandra:latest
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    networks:
+      - short-url
+    ports:
+      - "9042:9042"
+
 # Ensure all services share the same network, so they can connect via container names
 networks:
   short-url: null
 
 volumes:
   redis-data:
+  cassandra-data:
+
 

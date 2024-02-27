@@ -24,7 +24,7 @@ type UrlCreateRequest struct {
 func CreateShortUrl(c *gin.Context) {
 	var createRequest UrlCreateRequest
 	if err := c.ShouldBindJSON(&createRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"validation error": err.Error()})
 		return
 	}
 	fmt.Printf("Long URL: %s\n", createRequest.OriUrl)
@@ -43,5 +43,4 @@ func RedirectShortUrl(c *gin.Context) {
 	originalUrl := store.GetUrlMapping(shortUrl)
 	// use redirect func from gin context
 	c.Redirect(302, originalUrl)
-
 }
