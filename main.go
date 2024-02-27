@@ -24,7 +24,10 @@ func main() {
 
 	// Initialize store before starting URL shortening service
 	store.InitializeStore()
+	// Defer closing the store
+	defer store.CloseStore()
 
+	// Start the web server
 	err := router.Run(":9808")
 	if err != nil {
 		panic(fmt.Sprintf("Failed to start the web server. Error: %v", err))

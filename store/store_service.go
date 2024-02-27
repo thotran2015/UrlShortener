@@ -13,7 +13,7 @@ import (
 
 type StorageService struct {
 	redisClient      *redis.Client
-	cassandraCluster *gocql.ClusterConfig
+	cassandraSession *gocql.Session
 }
 
 // Top level declarations for storeService and redis context
@@ -49,21 +49,19 @@ func InitializeStore() *StorageService {
 	if err != nil {
 		log.Printf("Failed to create a Cassandra session. Error: %v\n", err)
 	}
-	defer session.Close()
 	// Create a keyspace if it doesn't exist
 	createKeyspaceQuery := fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1}", cassandraKeyspace)
 	err = session.Query(createKeyspaceQuery).Exec()
 	if err != nil {
 		log.Printf("Failed to create a Cassandra keyspace. Error: %v\n", err)
 	}
-	cluster.Keyspace = cassandraKeyspace
 	// Create a table if it doesn't exist
 	createTableQuery := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s (short_url text PRIMARY KEY, original_url text)", cassandraKeyspace, cassandraTable)
 	err = session.Query(createTableQuery).Exec()
 	if err != nil {
 		log.Printf("Failed to create a Cassandra table. Error: %v\n", err)
 	}
-	storeService.cassandraCluster = cluster
+	storeService.cassandraSession = session
 	return storeService
 }
 
@@ -72,13 +70,8 @@ func SaveUrlMapping(shortUrl string, originalUrl string) {
 	if err != nil {
 		log.Println(fmt.Sprintf("Failed saving key url in redis. Error: %v - shortUrl: %s - originalUrl: %s\n", err, shortUrl, originalUrl))
 	}
-	session, err := storeService.cassandraCluster.CreateSession()
-	if err != nil {
-		log.Printf("Failed to create a Cassandra session. Error: %v\n", err)
-	}
-	defer session.Close()
-	insertQuery := fmt.Sprintf("INSERT INTO %s (short_url, original_url) VALUES (?, ?)", cassandraTable)
-	err = session.Query(insertQuery, shortUrl, originalUrl).Exec()
+	insertQuery := fmt.Sprintf("INSERT INTO %s.%s (short_url, original_url) VALUES (?, ?)", cassandraKeyspace, cassandraTable)
+	err = storeService.cassandraSession.Query(insertQuery, shortUrl, originalUrl).Exec()
 	if err != nil {
 		log.Printf("Failed to insert a new url mapping into Cassandra. Error: %v\n", err)
 	}
@@ -93,12 +86,12 @@ func GetUrlMapping(shortUrl string) string {
 		return res
 	}
 	// If not found in Redis, check in Cassandra
-	session, err := storeService.cassandraCluster.CreateSession()
-	if err != nil {
-		log.Printf("Failed to create a Cassandra session. Error: %v\n", err)
-	}
-	defer session.Close()
-	selectQuery := fmt.Sprintf("SELECT original_url FROM %s WHERE short_url = ? LIMIT 1", cassandraTable)
-	session.Query(selectQuery, shortUrl).Scan(&res)
+	selectQuery := fmt.Sprintf("SELECT original_url FROM %s.%s WHERE short_url = ? LIMIT 1", cassandraKeyspace, cassandraTable)
+	storeService.cassandraSession.Query(selectQuery, shortUrl).Scan(&res)
 	return res
+}
+
+func CloseStore() {
+	storeService.redisClient.Close()
+	storeService.cassandraSession.Close()
 }
